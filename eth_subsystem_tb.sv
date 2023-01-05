@@ -42,22 +42,6 @@ typedef struct {
 	bit [15:0] udp_checksum_r;
 } udp_packet;
 
-
-typedef struct {
-	bit [47:0]	eth_dest_mac_r;
-	bit [47:0]	eth_src_mac_r;
-	bit [15:0]	eth_type_r;
-	bit [15:0]	arp_htype_r;
-	bit [15:0]	arp_ptype_r;
-	bit [7:0]	arp_hlen_r;
-	bit [7:0]	arp_plen_r;
-	bit [15:0]	arp_oper_r;
-	bit [47:0]	arp_sha_r;
-	bit [31:0]	arp_spa_r;
-	bit [47:0]	arp_tha_r;
-	bit [31:0]	arp_tpa_r;
-} arp_packet;
-
 eth_hw_core_v1_0 
 eth_hw_core_v1_0_inst
 (
@@ -131,20 +115,6 @@ initial begin
 	for (int i = 0; i < count; i = i + 1) begin
 		lfm_pkg.udp_payload[i] = i;
 	end
-
-	arp_packet arp_req;
-	arp_req.eth_dest_mac_r = {8'h02, 8'h00, 8'h00, 8'h00, 8'h00, 8'h00};
-	arp_req.eth_src_mac_r = {8'h01, 8'h00, 8'h00, 8'h00, 8'h00, 8'h00};
-	arp_req.eth_type_r = ;
-	arp_req.arp_htype_r = ;
-	arp_req.arp_ptype_r = ;
-	arp_req.arp_hlen_r = ;
-	arp_req.arp_plen_r = ;
-	arp_req.arp_oper_r = ;
-	arp_req.arp_sha_r = ;
-	arp_req.arp_spa_r = ;
-	arp_req.arp_tha_r = ;
-	arp_req.arp_tpa_r = ;
 
 	eth_pkg_reg[0] = lfm_pkg.eth_dest_mac_r[31:0];
 	eth_pkg_reg[1] = {lfm_pkg.eth_dest_mac_r[47:32], lfm_pkg.eth_src_mac_r[47:32]};

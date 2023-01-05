@@ -1,8 +1,7 @@
 
 `timescale 1 ns / 1 ps
 
-	module eth_hw_core_v1_0 #
-	(
+	module eth_hw_core_v1_0 #(
 
 		parameter integer C_eth_txd_TDATA_WIDTH	= 32,
 
@@ -317,14 +316,7 @@
                         //Проверяем IP адрес назначения
                         if({eth_rxd_tdata[15 : 8], eth_rxd_tdata[7 : 0], recv_dst_ip_addr[2], recv_dst_ip_addr[3]} == {self_ip_addr[0], self_ip_addr[1], self_ip_addr[2], self_ip_addr[3]}) begin
                             //Проверяем тип пакета вложенного в IP 
-                            if(recv_ip_protocol == 8'h01) begin //ICMP пакет
-                                //Проверяем тип и код ICMP пакета
-                                if(eth_rxd_tdata[23 : 16] == 8'h08 && eth_rxd_tdata[31 : 24] == 8'h00) begin
-                                    recv_state <= 10;      
-                                end else begin
-                                    recv_state <= 21;
-                                end                       
-                            end else if(recv_ip_protocol == 8'h11) begin //UDP пакет
+                            if(recv_ip_protocol == 8'h11) begin //UDP пакет
                                 //Сохраняем порт отправителя UDP пакета
                                 recv_udp_src_port <= {eth_rxd_tdata[23 : 16], eth_rxd_tdata[31 : 24]};
                                 
@@ -336,102 +328,6 @@
                             //Отбрасываем пакет, так как указан не верный IP адрес назначения
                             recv_state <= 21;
                         end                
-                    end
-                end
-                12: begin //Прием ARP пакета
-                    if(eth_rxd_tvalid == 1) begin
-                        //Проверяем что размер MAC адреса в запросе равен 6, размер IP адреса равен 4, код сетевого протокола IP (0x0800)
-                        if(eth_rxd_tdata[23 : 16] == 8'h06 && eth_rxd_tdata[31 : 24] == 8'h04 && {eth_rxd_tdata[7 : 0], eth_rxd_tdata[15 : 8]} == 16'h0800) begin 
-                            recv_state <= 13;
-                        end else begin
-                            //Поступивший ARP запрос не поддерживается
-                            recv_state <= 21;
-                        end
-                    end
-                end
-                13: begin //Прием ARP пакета
-                    if(eth_rxd_tvalid == 1) begin
-                        //Проверяем что MAC адрес указанный в ETH пакете и ARP пакете равны, тип пакета ARP запрос
-                        if(recv_src_mac_addr[5] == eth_rxd_tdata[23 : 16] && recv_src_mac_addr[4] == eth_rxd_tdata[31 : 24] && {eth_rxd_tdata[7 : 0], eth_rxd_tdata[15 : 8]} == 16'h0001) begin
-                            recv_state <= 14;
-                        end else begin
-                            //Ошибка в поступившем ARP запросе
-                            recv_state <= 21;
-                        end
-                    end
-                end
-                14: begin //Прием ARP пакета
-                    if(eth_rxd_tvalid == 1) begin
-                        //Проверяем что MAC адрес указанный в ETH пакете и ARP пакете равны
-                        if(recv_src_mac_addr[3] == eth_rxd_tdata[7 : 0] && recv_src_mac_addr[2] == eth_rxd_tdata[15 : 8] && recv_src_mac_addr[1] == eth_rxd_tdata[23 : 16] && recv_src_mac_addr[0] == eth_rxd_tdata[31 : 24]) begin
-                            recv_state <= 15;
-                        end else begin
-                            //Ошибка в поступившем ARP запросе
-                            recv_state <= 21;
-                        end
-                    end    
-                end
-                15: begin //Прием ARP пакета
-                    if(eth_rxd_tvalid == 1) begin
-                        //Сохраняем IP адрес абонента сформировавшего ARP запрос
-                        recv_src_ip_addr[3] <= eth_rxd_tdata[15 : 8];
-                        recv_src_ip_addr[2] <= eth_rxd_tdata[7 : 0];
-                        recv_src_ip_addr[1] <= eth_rxd_tdata[31 : 24];
-                        recv_src_ip_addr[0] <= eth_rxd_tdata[23 : 16];
-                        
-                        //Проверяем MAC адрес получателя (принимаем "свой" или широковещательный)                
-                        if({recv_dst_mac_addr[0], recv_dst_mac_addr[1], recv_dst_mac_addr[2], recv_dst_mac_addr[3], recv_dst_mac_addr[4], recv_dst_mac_addr[5]} == 48'hFFFFFFFFFFFF ||
-                           {recv_dst_mac_addr[0], recv_dst_mac_addr[1], recv_dst_mac_addr[2], recv_dst_mac_addr[3], recv_dst_mac_addr[4], recv_dst_mac_addr[5]} == {self_mac_addr[0], self_mac_addr[1], self_mac_addr[2], self_mac_addr[3], self_mac_addr[4], self_mac_addr[5]}) begin
-                        
-                            recv_state <= 16;
-                        end else begin
-                            recv_state <= 21;
-                        end
-                    end           
-                end
-                16: begin //Прием ARP пакета
-                    if(eth_rxd_tvalid == 1) begin
-                        //Проверяем что поле с MAC адресом получателя не заполнено
-                        if(eth_rxd_tdata[7 : 0] == 8'h00 && eth_rxd_tdata[15 : 8] == 8'h00 && eth_rxd_tdata[23 : 16] == 8'h00 && eth_rxd_tdata[31 : 24] == 8'h00) begin
-                            recv_state <= 17;
-                        end else begin
-                            //Ошибка в поступившем ARP запросе
-                            recv_state <= 21;
-                        end
-                    end
-                end        
-                17: begin //Прием ARP пакета
-                    if(eth_rxd_tvalid == 1) begin
-                        //Сохраняем часть IP адреса, для которого запрашивается MAC адрес
-                        recv_dst_ip_addr[3] <= eth_rxd_tdata[23 : 16];
-                        recv_dst_ip_addr[2] <= eth_rxd_tdata[31 : 24];
-                        
-                        //Проверяем что поле с MAC адресом получателя не заполнено
-                        if(eth_rxd_tdata[7 : 0] == 8'h00 && eth_rxd_tdata[15 : 8] == 8'h00) begin
-                            recv_state <= 18;
-                        end else begin
-                            //Ошибка в поступившем ARP запросе
-                            recv_state <= 21;
-                        end
-                    end
-                end
-                18: begin //Прием ARP пакета
-                    if(eth_rxd_tvalid == 1) begin
-                        //Сохраняем часть IP адреса, для которого запрашивается MAC адрес
-                        recv_dst_ip_addr[1] <= eth_rxd_tdata[7 : 0];
-                        recv_dst_ip_addr[0] <= eth_rxd_tdata[15 : 8];
-                         
-                        if(recv_dst_ip_addr[3] == self_ip_addr[3] && recv_dst_ip_addr[2] == self_ip_addr[2] && eth_rxd_tdata[7 : 0] == self_ip_addr[1] && eth_rxd_tdata[15 : 8] == self_ip_addr[0]) begin                
-                            recv_state <= 23;
-                        end else begin
-                            //ARP запрос не наш, отбрасываем его
-                            recv_state <= 21;
-                        end                
-                    end
-                end
-                23: begin //Запись в буфер запросов на передачу ARP ответов 
-                    if(fifo_arp_answer_full == 0) begin
-                        recv_state <= 21;
                     end
                 end
                 19: begin //Прием UDP заголовка
@@ -579,104 +475,6 @@
     //Сигналы чтения из буфера данных исходящих UDP пакетов 
     assign send_udp_data_re = (send_state == 13) && (send_udp_data_size != 0) && (eth_txd_tready == 1);
     
-    //Ядро обработки UDP пакетов
-    udp_core udp_core_i
-    (
-        //Интерфейс доступа к регистрам блока
-        .ctrl_aclk(ctrl_aclk),
-        .ctrl_aresetn(ctrl_aresetn),
-        .ctrl_awaddr(ctrl_awaddr),
-        .ctrl_awprot(ctrl_awprot),
-        .ctrl_awvalid(ctrl_awvalid),
-        .ctrl_awready(ctrl_awready),
-        .ctrl_wdata(ctrl_wdata),
-        .ctrl_wstrb(ctrl_wstrb),
-        .ctrl_wvalid(ctrl_wvalid),
-        .ctrl_wready(ctrl_wready),
-        .ctrl_bresp(ctrl_bresp),
-        .ctrl_bvalid(ctrl_bvalid),
-        .ctrl_bready(ctrl_bready),
-        .ctrl_araddr(ctrl_araddr),
-        .ctrl_arprot(ctrl_arprot),
-        .ctrl_arvalid(ctrl_arvalid),
-        .ctrl_arready(ctrl_arready),
-        .ctrl_rdata(ctrl_rdata),
-        .ctrl_rresp(ctrl_rresp),
-        .ctrl_rvalid(ctrl_rvalid),
-        .ctrl_rready(ctrl_rready),
-        
-         //Интерфейс передаваемых потоковых данных
-        .data_aclk(data_aclk),
-        .data_tready(data_tready),
-        .data_tdata(data_tdata),
-        .data_tkeep(data_tkeep),
-        .data_tlast(data_tlast),
-        .data_tvalid(data_tvalid),
-                 
-        //MAC адрес блока
-        .self_mac_addr0(self_mac_addr[0]),
-        .self_mac_addr1(self_mac_addr[1]),
-        .self_mac_addr2(self_mac_addr[2]),
-        .self_mac_addr3(self_mac_addr[3]),
-        .self_mac_addr4(self_mac_addr[4]),
-        .self_mac_addr5(self_mac_addr[5]),
-                 
-        //IP адрес блока
-        .self_ip_addr0(self_ip_addr[0]),
-        .self_ip_addr1(self_ip_addr[1]),
-        .self_ip_addr2(self_ip_addr[2]),
-        .self_ip_addr3(self_ip_addr[3]),
-                           
-        //Интерфейс приема UDP пакетов
-        .udp_ctrl_din(recv_udp_ctrl_dout),
-        .udp_ctrl_re(recv_udp_ctrl_re),
-        .udp_ctrl_empty(recv_udp_ctrl_empty),
-           
-        .udp_data_din(recv_udp_data_dout),
-        .udp_data_re(recv_udp_data_re),
-        .udp_data_empty(recv_udp_data_empty),
-           
-        //Интерфейс передачи UDP пакетов
-        .udp_ctrl_dout(send_udp_ctrl_din),
-        .udp_ctrl_we(send_udp_ctrl_we),
-        .udp_ctrl_full(send_udp_ctrl_full),
-           
-        .udp_data_dout(send_udp_data_din),
-        .udp_data_we(send_udp_data_we),
-        .udp_data_full(send_udp_data_full)
-    );
-    
-    //Буфер запросов на передачу ARP ответов
-    fifo80x80x16 arp_answer_buf_i 
-    (
-        .clk(ctrl_aclk),
-        .rst(~ctrl_aresetn),
-        
-        .din(fifo_arp_answer_din),
-        .wr_en(fifo_arp_answer_we),
-        .full(fifo_arp_answer_full),
-        
-        .rd_en(fifo_arp_answer_re),
-        .dout(fifo_arp_answer_dout),
-        .empty(fifo_arp_answer_empty)
-    );
-     
-     //Сигналы чтения из буфера запросов на передачу ARP ответов
-    assign fifo_arp_answer_re = (send_state == 2); 
-        
-    //Сигналы записи в буфер запросов на передачу ARP ответов
-    assign fifo_arp_answer_din = {recv_src_ip_addr[1],
-                                  recv_src_ip_addr[0],
-                                  recv_src_ip_addr[3],
-                                  recv_src_ip_addr[2],
-                                  recv_src_mac_addr[4], 
-                                  recv_src_mac_addr[5], 
-                                  recv_src_mac_addr[2], 
-                                  recv_src_mac_addr[3], 
-                                  recv_src_mac_addr[0], 
-                                  recv_src_mac_addr[1]}; 
-    assign fifo_arp_answer_we  = (recv_state == 23);
-
     //Интерфейс приема служебной информации
     assign eth_rxs_tready = (recv_state == 0);
 
@@ -730,72 +528,6 @@
                         end
                     end
                 end    
-                2: begin //Формирование ARP ответа
-                    //Eth заголовок
-                    
-                    //DST MAC
-                    {send_eth_hdr[0], send_eth_hdr[1], send_eth_hdr[2]} <= fifo_arp_answer_dout[47 : 0];
-                    //SRC MAC
-                    {send_eth_hdr[3], send_eth_hdr[4], send_eth_hdr[5]} <= {self_mac_addr[4], self_mac_addr[5], self_mac_addr[2], self_mac_addr[3], self_mac_addr[0], self_mac_addr[1]};
-                    //Protokol type - ARP
-                    send_eth_hdr[6] <= 16'h0608;
-                    
-                    //ARP ответ
-                    
-                    //HTYPE = 0x0001 - Ethernet
-                    send_arp_data[0] <= 16'h0100; 
-                    //PTYPE = 0x0800 - IP 
-                    send_arp_data[1] <= 16'h0008;
-                    //Hardware length 0x06, protocol length 0x04 
-                    send_arp_data[2] <= 16'h0406;
-                    //Operation = 0x0002 - ARP answer 
-                    send_arp_data[3] <= 16'h0200; 
-                    //SRC MAC
-                    {send_arp_data[6], send_arp_data[5], send_arp_data[4]} <= {self_mac_addr[0], self_mac_addr[1], self_mac_addr[2], self_mac_addr[3], self_mac_addr[4], self_mac_addr[5]};
-                    //SRC IP
-                    {send_arp_data[8], send_arp_data[7]} <= {self_ip_addr[0], self_ip_addr[1], self_ip_addr[2], self_ip_addr[3]};
-                    //DST MAC
-                    {send_arp_data[9], send_arp_data[10], send_arp_data[11]} <= fifo_arp_answer_dout[47 : 0];
-                    //DST IP         
-                    {send_arp_data[13], send_arp_data[12]} <= fifo_arp_answer_dout[79 : 48];         
-                    
-                    send_arp_pkg_size <= 42;
-                            
-                    send_state <= 3;
-                end
-                3: begin //Передача ARP ответа
-                    if(eth_txd_tready == 1) begin
-                        //Сдвиг передаваемых данных
-                        for(i = 0; i < 2; i = i + 1) begin
-                            send_eth_hdr[i * 2] <= send_eth_hdr[(i + 1) * 2];
-                            send_eth_hdr[i * 2 + 1] <= send_eth_hdr[(i + 1) * 2 + 1];
-                        end
-                        
-                        send_eth_hdr[4] <= send_eth_hdr[6];
-                        send_eth_hdr[5] <= send_arp_data[0];
-                        
-                        send_eth_hdr[6] <= send_arp_data[1];
-                        send_arp_data[0] <= send_arp_data[2];
-                        
-                        for(i = 0; i < 5; i = i + 1) begin
-                            send_arp_data[i * 2 + 2] <= send_arp_data[(i + 1) * 2 + 2];
-                            send_arp_data[i * 2 + 1] <= send_arp_data[(i + 1) * 2 + 1];
-                        end
-                        
-                        send_arp_data[11] <= send_arp_data[13];
-                        send_arp_data[12] <= 16'h0000;
-                        send_arp_data[13] <= 16'h0000;
-                        
-                        //Условие завершения передачи пакета
-                        if(send_arp_pkg_size > 4) begin
-                            send_arp_pkg_size <= send_arp_pkg_size - 4;
-                        end else begin
-                            send_arp_pkg_size <= 0;
-   
-                            send_state <= 0;
-                        end
-                    end
-                end
                 10: begin //Формирование UDP ответа
                     //Eth заголовок
                                                     
@@ -942,16 +674,6 @@
     assign ip_crc_calc_sop = (ip_crc_calc_counter == 4);            
     assign ip_crc_calc_eop = (ip_crc_calc_counter == 0);       
      
-    reg [31 : 0] icmp_crc_calc_din_mux;
-    
-    always @(*) begin
-        if(icmp_crc_calc_counter == 0)
-            icmp_crc_calc_din_mux <= {send_icmp_hdr[1], send_icmp_hdr[0]};
-        else if(icmp_crc_calc_counter == 1)
-            icmp_crc_calc_din_mux <= {send_icmp_hdr[3], send_icmp_hdr[2]};
-        else
-            icmp_crc_calc_din_mux <= {16'h0000, fifo_ping_answer_din[143 : 128]}; 
-    end 
     
     assign icmp_crc_calc_din = icmp_crc_calc_din_mux;   
     assign icmp_crc_calc_en = (send_state == 7);
