@@ -1,56 +1,46 @@
-
 `timescale 1 ns / 1 ps
 
-	module eth_hw_core_v1_0 #(
+module udp_complete #(
+    parameter TDATA_WIDTH = 32
+)
+(
+	output wire  eth_txd_tvalid,
+	output wire [TDATA_WIDTH-1 : 0] eth_txd_tdata,
+	output wire [(TDATA_WIDTH/8)-1 : 0] eth_txd_tkeep,
+	output wire  eth_txd_tlast,
+	input wire  eth_txd_tready,
 
-		parameter integer C_eth_txd_TDATA_WIDTH	= 32,
+	output wire  eth_txc_tvalid,
+	output wire [TDATA_WIDTH-1 : 0] eth_txc_tdata,
+	output wire [(TDATA_WIDTH/8)-1 : 0] eth_txc_tkeep,
+	output wire  eth_txc_tlast,
+	input wire  eth_txc_tready,
 
-		parameter integer C_eth_txc_TDATA_WIDTH	= 32,
+	output wire  eth_rxd_tready,
+	input wire [TDATA_WIDTH-1 : 0] eth_rxd_tdata,
+	input wire [(TDATA_WIDTH/8)-1 : 0] eth_rxd_tkeep,
+	input wire  eth_rxd_tlast,
+	input wire  eth_rxd_tvalid,
 
-		parameter integer C_eth_rxd_TDATA_WIDTH	= 32,
-
-		parameter integer C_eth_rxs_TDATA_WIDTH	= 32,
+	output wire  eth_rxs_tready,
+	input wire [TDATA_WIDTH-1 : 0] eth_rxs_tdata,
+	input wire [(TDATA_WIDTH/8)-1 : 0] eth_rxs_tkeep,
+	input wire  eth_rxs_tlast,
+	input wire  eth_rxs_tvalid,
 		
-        parameter integer C_data_TDATA_WIDTH    = 32
-	)
-	(
-		output wire  eth_txd_tvalid,
-		output wire [C_eth_txd_TDATA_WIDTH-1 : 0] eth_txd_tdata,
-		output wire [(C_eth_txd_TDATA_WIDTH/8)-1 : 0] eth_txd_tkeep,
-		output wire  eth_txd_tlast,
-		input wire  eth_txd_tready,
-
-		output wire  eth_txc_tvalid,
-		output wire [C_eth_txc_TDATA_WIDTH-1 : 0] eth_txc_tdata,
-		output wire [(C_eth_txc_TDATA_WIDTH/8)-1 : 0] eth_txc_tkeep,
-		output wire  eth_txc_tlast,
-		input wire  eth_txc_tready,
-
-		output wire  eth_rxd_tready,
-		input wire [C_eth_rxd_TDATA_WIDTH-1 : 0] eth_rxd_tdata,
-		input wire [(C_eth_rxd_TDATA_WIDTH/8)-1 : 0] eth_rxd_tkeep,
-		input wire  eth_rxd_tlast,
-		input wire  eth_rxd_tvalid,
-
-		output wire  eth_rxs_tready,
-		input wire [C_eth_rxs_TDATA_WIDTH-1 : 0] eth_rxs_tdata,
-		input wire [(C_eth_rxs_TDATA_WIDTH/8)-1 : 0] eth_rxs_tkeep,
-		input wire  eth_rxs_tlast,
-		input wire  eth_rxs_tvalid,
-		
-		input wire data_aclk,
-        output wire data_tready,
-        input wire [C_data_TDATA_WIDTH-1 : 0] data_tdata,
-        input wire [(C_data_TDATA_WIDTH/8)-1 : 0] data_tkeep,
-        input wire data_tlast,
-        input wire data_tvalid
-	);
+	input wire data_aclk,
+    output wire data_tready,
+    input wire [TDATA_WIDTH-1 : 0] data_tdata,
+    input wire [(TDATA_WIDTH/8)-1 : 0] data_tkeep,
+    input wire data_tlast,
+    input wire data_tvalid
+);
     
     //MAC адрес блока
     wire [7 : 0] self_mac_addr[0 : 5];
 
     //IP адрес блока
-    (* mark_debug *) wire [7 : 0] self_ip_addr[0 : 3];  
+    wire [7 : 0] self_ip_addr[0 : 3];  
     
     //Счетчик для циклов
     integer i;
@@ -697,7 +687,7 @@
             eth_txd_tkeep_mux <= 4'h7;
         else if((send_state == 9 && send_ping_pkg_size == 2) || (send_state == 13 || send_udp_pkg_size == 2)) 
             eth_txd_tkeep_mux <= 4'h3;
-        else if((send_state == 9 &&send_ping_pkg_size == 1) || (send_state == 13 || send_udp_pkg_size == 1)) 
+        else if((send_state == 9 && send_ping_pkg_size == 1) || (send_state == 13 || send_udp_pkg_size == 1)) 
             eth_txd_tkeep_mux <= 4'h1;            
         else
             eth_txd_tkeep_mux <= 4'hF;    
