@@ -97,21 +97,21 @@ initial begin
 	lfm_pkg.eth_type_r = 16'h0800;
 	lfm_pkg.ip_version_r = 4'h4;
 	lfm_pkg.ip_ihl_r = 4'h5;
-	lfm_pkg.ip_dscp_r = ; 
-	lfm_pkg.ip_ecn_r = ; 
-	lfm_pkg.ip_length_r = ; 
-	lfm_pkg.ip_identification_r = ; 
-	lfm_pkg.ip_flags_r = ; 
-	lfm_pkg.ip_fragment_offset_r = ; 
-	lfm_pkg.ip_ttl_r = ; 
-	lfm_pkg.ip_protocol_r = ; 
-	lfm_pkg.ip_header_checksum_r = ; 
-	lfm_pkg.ip_source_ip_r = ; 
-	lfm_pkg.ip_dest_ip_r = ; 
-	lfm_pkg.udp_source_port_r = ; 
-	lfm_pkg.udp_dest_port_r = ;
-	lfm_pkg.udp_length_r = ; 
-	lfm_pkg.udp_checksum_r = ; 
+	lfm_pkg.ip_dscp_r = {}; 
+	lfm_pkg.ip_ecn_r = {}; 
+	lfm_pkg.ip_length_r = {}; 
+	lfm_pkg.ip_identification_r = {}; 
+	lfm_pkg.ip_flags_r = {}; 
+	lfm_pkg.ip_fragment_offset_r = {}; 
+	lfm_pkg.ip_ttl_r = {}; 
+	lfm_pkg.ip_protocol_r = {}; 
+	lfm_pkg.ip_header_checksum_r = {}; 
+	lfm_pkg.ip_source_ip_r = {}; 
+	lfm_pkg.ip_dest_ip_r = {}; 
+	lfm_pkg.udp_source_port_r = {}; 
+	lfm_pkg.udp_dest_port_r = {};
+	lfm_pkg.udp_length_r = {}; 
+	lfm_pkg.udp_checksum_r = {}; 
 	for (int i = 0; i < count; i = i + 1) begin
 		lfm_pkg.udp_payload[i] = i;
 	end
@@ -119,7 +119,24 @@ initial begin
 	eth_pkg_reg[0] = lfm_pkg.eth_dest_mac_r[31:0];
 	eth_pkg_reg[1] = {lfm_pkg.eth_dest_mac_r[47:32], lfm_pkg.eth_src_mac_r[47:32]};
 	eth_pkg_reg[2] = lfm_pkg.eth_src_mac_r[31:0];
-	eth_pkg_reg[3] = ;
+	eth_pkg_reg[3] = {	lfm_pkg.eth_type_r, 
+						lfm_pkg.ip_version_r, 
+						lfm_pkg.ip_ihl_r, 
+						lfm_pkg.ip_dscp_r,
+						lfm_pkg.ip_ecn_r};
+	eth_pkg_reg[4] = {lfm_pkg.ip_length_r, lfm_pkg.ip_identification_r};
+	eth_pkg_reg[5] = {lfm_pkg.ip_flags_r, lfm_pkg.ip_fragment_offset_r, lfm_pkg.ip_ttl_r, lfm_pkg.ip_protocol_r};
+	eth_pkg_reg[6] = {lfm_pkg.ip_header_checksum_r, lfm_pkg.ip_source_ip_r};
+	eth_pkg_reg[7] = {lfm_pkg.ip_dest_ip_r, lfm_pkg.udp_source_port_r};
+	eth_pkg_reg[8] = {lfm_pkg.udp_dest_port_r, lfm_pkg.udp_length_r};
+	eth_pkg_reg[9] = {lfm_pkg.udp_checksum_r, lfm_pkg.udp_payload[0], lfm_pkg.udp_payload[1]};
+
+	for (int i = 0; i < count; i++) begin
+		eth_pkg_reg[i + 10] = {	lfm_pkg.udp_payload[3*i + 3], 
+								lfm_pkg.udp_payload[3*i + 4], 
+								lfm_pkg.udp_payload[3*i + 5], 
+								lfm_pkg.udp_payload[3*i + 6]};
+	end
 
 	wait(eth_rxd_tready);
 	wait(eth_rxs_tready);
