@@ -1,39 +1,44 @@
 `timescale 1 ns / 1 ps
 
 module udp_complete #(
-    parameter TDATA_WIDTH = 32
+    parameter DATA_WIDTH = 32
 )
 (
+    input wire  clk,
+    input wire  rst,
+
 	output wire  eth_txd_tvalid,
-	output wire [TDATA_WIDTH-1 : 0] eth_txd_tdata,
-	output wire [(TDATA_WIDTH/8)-1 : 0] eth_txd_tkeep,
+	output wire [DATA_WIDTH-1 : 0] eth_txd_tdata,
+	output wire [(DATA_WIDTH/8)-1 : 0] eth_txd_tkeep,
 	output wire  eth_txd_tlast,
 	input wire  eth_txd_tready,
 
 	output wire  eth_txc_tvalid,
-	output wire [TDATA_WIDTH-1 : 0] eth_txc_tdata,
-	output wire [(TDATA_WIDTH/8)-1 : 0] eth_txc_tkeep,
+	output wire [DATA_WIDTH-1 : 0] eth_txc_tdata,
+	output wire [(DATA_WIDTH/8)-1 : 0] eth_txc_tkeep,
 	output wire  eth_txc_tlast,
 	input wire  eth_txc_tready,
 
 	output wire  eth_rxd_tready,
-	input wire [TDATA_WIDTH-1 : 0] eth_rxd_tdata,
-	input wire [(TDATA_WIDTH/8)-1 : 0] eth_rxd_tkeep,
+	input wire [DATA_WIDTH-1 : 0] eth_rxd_tdata,
+	input wire [(DATA_WIDTH/8)-1 : 0] eth_rxd_tkeep,
 	input wire  eth_rxd_tlast,
 	input wire  eth_rxd_tvalid,
 
 	output wire  eth_rxs_tready,
-	input wire [TDATA_WIDTH-1 : 0] eth_rxs_tdata,
-	input wire [(TDATA_WIDTH/8)-1 : 0] eth_rxs_tkeep,
+	input wire [DATA_WIDTH-1 : 0] eth_rxs_tdata,
+	input wire [(DATA_WIDTH/8)-1 : 0] eth_rxs_tkeep,
 	input wire  eth_rxs_tlast,
 	input wire  eth_rxs_tvalid,
 		
-	input wire data_aclk,
-    output wire data_tready,
-    input wire [TDATA_WIDTH-1 : 0] data_tdata,
-    input wire [(TDATA_WIDTH/8)-1 : 0] data_tkeep,
-    input wire data_tlast,
-    input wire data_tvalid
+    input wire [DATA_WIDTH-1 : 0]   s_axis_data_tdata,
+    input wire                      s_axis_data_tvalid,
+    input wire                      s_axis_data_tlast,
+
+    output wire [DATA_WIDTH-1 : 0]  m_axis_data_tdata,
+    output wire                     m_axis_data_tvalid,
+    input  wire                     m_axis_data_tready,
+    output wire                     m_axis_data_tlast
 );
     
     //MAC адрес блока
@@ -44,15 +49,6 @@ module udp_complete #(
     
     //Счетчик для циклов
     integer i;
-    
-    //Буфер служебной информации связанной с входящими UDP пакетами
-    wire [127 : 0] recv_udp_ctrl_din;
-    wire recv_udp_ctrl_we;
-    wire recv_udp_ctrl_full;
-             
-    wire recv_udp_ctrl_re;
-    wire [127 : 0] recv_udp_ctrl_dout;
-    wire recv_udp_ctrl_empty;
     
     //Буфер данных входящих UDP пакетов     
     wire [31 : 0] recv_udp_data_din;
@@ -113,7 +109,7 @@ module udp_complete #(
     reg [7 : 0] recv_ip_hdr_crc;
     
     //IP адрес получателя входящего пакета
-    (* mark_debug *) reg [7 : 0] recv_dst_ip_addr[0 : 3];
+    reg [7 : 0] recv_dst_ip_addr[0 : 3];
         
     //IP адрес отправителя входящего пакета 
     reg [7 : 0] recv_src_ip_addr[0 : 3];
@@ -143,7 +139,7 @@ module udp_complete #(
     reg [15 : 0] send_udp_pkg_size;
     
     //Состояние автомата управляющего обработкой входящих пакетов
-	(* mark_debug *) reg [4 : 0] recv_state;
+	reg [4 : 0] recv_state;
 
     //Служебная информация связанная с исходящим пакетом
     reg [31 : 0] send_ctrl[0 : 5];
@@ -161,7 +157,7 @@ module udp_complete #(
     reg [5 : 0] send_arp_pkg_size;
     
     //Состояние конечного автомата управляющего отправкой пакетов
-    (* mark_debug *) reg [4 : 0] send_state;
+    reg [4 : 0] send_state;
     
     //Сигналы для доступа к блоку расчета контрольной суммы заголовка IP пакета   
     wire [31 : 0] ip_crc_calc_din;
@@ -175,7 +171,7 @@ module udp_complete #(
     reg [15 : 0] send_ip_hdr[0 : 9];
     
     //Счетчик управляющей загрузкой IP заголовка в блок расчета контрольной суммы
-    reg [2 : 0] ip_crc_calc_counter;
+    creg [2 : 0] ip_crc_calc_counter;
     
 	always @(posedge ctrl_aclk) begin
 		if (ctrl_aresetn == 1'b0) begin
@@ -344,7 +340,7 @@ module udp_complete #(
                     end
                 end   
                 22: begin //Прием UDP данных
-                    if(eth_rxd_tvalid == 1 && recv_udp_data_full == 0) begin
+                    if(eth_rxd_tvalid == 1) begin
                         //Буферизируем старшие два байта 
                         recv_udp_data_din_lo <= eth_rxd_tdata[31 : 16]; 
                                                         
@@ -358,14 +354,7 @@ module udp_complete #(
                     end    
                 end
                 28: begin //Запись последнего слова UDP данных        
-                    if(recv_udp_data_full == 0) begin
-                        recv_state <= 29;
-                    end
-                end
-                29: begin //Запись служебной информации связанной с входящим UDP пакетом
-                    if(recv_udp_ctrl_full == 0) begin
-                        recv_state <= 0;
-                    end                
+                    recv_state <= 0;
                 end
                 21: begin //Отбрасываем ошибочный пакет, принимаем "хвост" пакета  
                     if(eth_rxd_tvalid == 1 && eth_rxd_tlast == 1) begin
@@ -376,78 +365,28 @@ module udp_complete #(
 	    end 
 	end       
     
-    //Буфер служебной информации связанной с входящими UDP пакетами
-    fifo128x128x16 udp_recv_ctrl_buf_i 
-    (
-        .rst(~ctrl_aresetn),
-     
-        .wr_clk(ctrl_aclk),      
-        .din(recv_udp_ctrl_din),
-        .wr_en(recv_udp_ctrl_we),
-        .full(recv_udp_ctrl_full),
-             
-        .rd_clk(ctrl_aclk),     
-        .rd_en(recv_udp_ctrl_re),
-        .dout(recv_udp_ctrl_dout),
-        .empty(recv_udp_ctrl_empty)
-    );  
-    
-    assign recv_udp_ctrl_din = {recv_udp_size,
-                                recv_udp_dst_port,
-                                recv_udp_src_port,
-                                recv_src_ip_addr[2],
-                                recv_src_ip_addr[3],
-                                recv_src_ip_addr[0],
-                                recv_src_ip_addr[1],
-                                recv_src_mac_addr[4], 
-                                recv_src_mac_addr[5], 
-                                recv_src_mac_addr[2], 
-                                recv_src_mac_addr[3], 
-                                recv_src_mac_addr[0], 
-                                recv_src_mac_addr[1]}; 
-    
-    assign recv_udp_ctrl_we = (recv_state == 29); 
-    
     //Буфер данных входящих UDP пакетов
-    fifo32x32x2048 udp_recv_data_buf_i 
+    udp_recv_data_buf 
+    udp_recv_data_buf_i 
     (
-        .rst(~ctrl_aresetn),
+        .s_aclk(clk),
+        .s_aresetn(~rst),
      
-        .wr_clk(ctrl_aclk),      
-        .din(recv_udp_data_din),
-        .wr_en(recv_udp_data_we),
-        .full(recv_udp_data_full),
+        .s_axis_tdata(recv_udp_data_din),
+        .s_axis_tvalid(recv_udp_data_we),
+        .s_axis_tready(),
              
-        .rd_clk(ctrl_aclk),     
-        .rd_en(recv_udp_data_re),
-        .dout(recv_udp_data_dout),
-        .empty(recv_udp_data_empty)
+        .m_axis_tdata(m_axis_data_tdata),
+        .m_axis_tvalid(m_axis_data_tvalid),
+        .m_axis_tready(m_axis_data_tready)
     );      
     
     assign recv_udp_data_din = {eth_rxd_tdata[15 : 0], recv_udp_data_din_lo};   
     assign recv_udp_data_we = ((recv_state == 22) && (eth_rxd_tvalid == 1)) || (recv_state == 28);
     
-    //Буфер служебной информации связанной с исходящими UDP пакетами
-    fifo128x128x16 udp_send_ctrl_buf_i 
-    (
-        .rst(~ctrl_aresetn),
-     
-        .wr_clk(ctrl_aclk),      
-        .din(send_udp_ctrl_din),
-        .wr_en(send_udp_ctrl_we),
-        .full(send_udp_ctrl_full),
-             
-        .rd_clk(ctrl_aclk),     
-        .rd_en(send_udp_ctrl_re),
-        .dout(send_udp_ctrl_dout),
-        .empty(send_udp_ctrl_empty)
-    );  
-    
-    //Сигналы чтения из буфера служебной информации связанной с исходящими UDP пакетами
-    assign send_udp_ctrl_re = (send_state == 10);
-    
     //Буфер данных исходящих UDP пакетов
-    fifo32x32x2048 udp_send_data_buf_i 
+    udp_send_data_buf 
+    udp_send_data_buf_i 
     (
         .rst(~ctrl_aresetn),
      
