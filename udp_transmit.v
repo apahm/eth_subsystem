@@ -6,18 +6,18 @@ module udp_transmit
     input wire  rst,
 
 	output wire  eth_txd_tvalid,
-	output wire [DATA_WIDTH-1 : 0] eth_txd_tdata,
-	output wire [(DATA_WIDTH/8)-1 : 0] eth_txd_tkeep,
+	output wire [31 : 0] eth_txd_tdata,
+	output wire [3 : 0] eth_txd_tkeep,
 	output wire  eth_txd_tlast,
 	input wire  eth_txd_tready,
 
 	output wire                    eth_txc_tvalid,
-	output wire [DATA_WIDTH-1 : 0] eth_txc_tdata,
-	output wire [(DATA_WIDTH/8)-1 : 0] eth_txc_tkeep,
+	output wire [31 : 0] eth_txc_tdata,
+	output wire [3 : 0] eth_txc_tkeep,
 	output wire  eth_txc_tlast,
 	input wire  eth_txc_tready,
 
-    input wire [DATA_WIDTH-1 : 0]   s_axis_data_tdata,
+    input wire [31 : 0]   s_axis_data_tdata,
     input wire                      s_axis_data_tvalid,
     output wire                     s_axis_data_tready,
     input wire                      s_axis_data_tlast
@@ -89,20 +89,19 @@ module udp_transmit
     reg [15 : 0] send_ip_hdr[0 : 9];
     
     //Счетчик управляющей загрузкой IP заголовка в блок расчета контрольной суммы
-    creg [2 : 0] ip_crc_calc_counter;
+    reg [2 : 0] ip_crc_calc_counter;
     
     //Буфер данных исходящих UDP пакетов
     udp_send_data_buf 
     udp_send_data_buf_i 
     (
         .rst(rst),
-     
-        .wr_clk(clk),      
+        .clk(clk),
+        
         .din(s_axis_data_tdata),
         .wr_en(s_axis_data_tvalid),
         .full(),
              
-        .rd_clk(clk),     
         .rd_en(send_udp_data_re),
         .dout(send_udp_data_dout),
         .empty(send_udp_data_empty)
@@ -138,7 +137,7 @@ module udp_transmit
             //Автомат управляющий отправкой пакетов
             case(send_state)  
                 0: begin //Ожидание запросов на отправку пакетов
-                    if(fifo_arp_answer_empty == 0 || fifo_ping_answer_empty == 0 || send_udp_data_empty == 0) begin
+                    if(send_udp_data_empty == 0) begin
                         send_state <= 1; 
                     end
                 end                
@@ -317,13 +316,11 @@ module udp_transmit
     reg [3 : 0] eth_txd_tkeep_mux;
     
     always @(*) begin
-        if((send_state == 3) && (send_arp_pkg_size == 2)) 
-            eth_txd_tkeep_mux <= 4'h3;
-        else if((send_state == 9 && send_ping_pkg_size == 3) || (send_state == 13 || send_udp_pkg_size == 3)) 
+        if(send_state == 13 || send_udp_pkg_size == 3) 
             eth_txd_tkeep_mux <= 4'h7;
-        else if((send_state == 9 && send_ping_pkg_size == 2) || (send_state == 13 || send_udp_pkg_size == 2)) 
+        else if(send_state == 13 || send_udp_pkg_size == 2) 
             eth_txd_tkeep_mux <= 4'h3;
-        else if((send_state == 9 && send_ping_pkg_size == 1) || (send_state == 13 || send_udp_pkg_size == 1)) 
+        else if(send_state == 13 || send_udp_pkg_size == 1) 
             eth_txd_tkeep_mux <= 4'h1;            
         else
             eth_txd_tkeep_mux <= 4'hF;    
@@ -332,9 +329,7 @@ module udp_transmit
     assign eth_txd_tkeep = eth_txd_tkeep_mux;
     
     assign eth_txd_tvalid = (send_state == 3) || (send_state == 9) || (send_state == 13);
-    assign eth_txd_tlast =  ((send_state == 3) && (send_arp_pkg_size <= 4)) || 
-                            ((send_state == 9) && (send_ping_pkg_size <= 4)) || 
-                            ((send_state == 13) && (send_udp_pkg_size <= 4));
+    assign eth_txd_tlast = ((send_state == 13) && (send_udp_pkg_size <= 4));
     
     assign eth_txd_tdata = {send_eth_hdr[1], send_eth_hdr[0]}; 
 endmodule
